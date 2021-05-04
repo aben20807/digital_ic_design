@@ -13,21 +13,19 @@ reg [9:0] Xout;
 reg [9:0] Yout;
 
 reg [9:0] px [5:0];
-reg [9:0] py [5:0];
+reg [9:0] py [5:0]; 
 reg signed [10:0] vx [5:0];
 reg signed [10:0] vy [5:0];
-//reg signed [21:0] v1;
-//reg signed [21:0] v2, v3;
-reg [3:0] CurrState, Nextstate;
-parameter [3:0] InitState = 4'd0, 
-                InputState = 4'd1, 
-                CrossSort_even = 4'd2, 
-                CrossSort_odd = 4'd3,
-                OutputState = 4'd4,
-                //CrossSort_even_nxt = 4'd7,
-                CrossSort_even_start = 4'd8,
-                //CrossSort_odd_nxt = 4'd9,
-                CrossSort_odd_start = 4'd10;
+wire cross_compare_result;
+
+reg [2:0] CurrState, Nextstate;
+parameter [2:0] InitState = 3'd0, 
+                InputState = 3'd1, 
+                Sort_even = 3'd2, 
+                Sort_odd = 3'd3,
+                OutputState = 3'd4,
+                Sort_even_start = 3'd5,
+                Sort_odd_start = 3'd6;
                 
 reg [2:0] in_i, out_i, sort_outer, i;
 integer j;
@@ -40,6 +38,8 @@ always @(posedge clk or posedge reset) begin
     CurrState <= Nextstate;
 end
 
+assign cross_compare_result = ((vx[i]*vy[i+1]) - (vx[i+1]*vy[i])) > 0;
+
 // Counter: in_i
 always @(posedge clk or posedge reset) begin
   if (reset)
@@ -47,9 +47,7 @@ always @(posedge clk or posedge reset) begin
   else begin
     case(CurrState)
       InputState:
-      begin
         in_i <= in_i + 3'd1;
-      end
       default:
         in_i <= 3'd0;
     endcase
@@ -63,10 +61,8 @@ always @(posedge clk or posedge reset) begin
   else begin
     case(CurrState)
       OutputState:
-      begin
         out_i <= out_i + 3'd1;
-      end
-      default:
+      default: 
         out_i <= 3'd0;
     endcase
   end
@@ -78,30 +74,30 @@ always @(posedge clk or posedge reset) begin
     sort_outer <= 3'd0;
   else begin
     case(CurrState)
-      CrossSort_odd:
-      begin
+      Sort_odd:
         sort_outer <= sort_outer + 3'd1;
-      end
-      CrossSort_even_start, CrossSort_even, CrossSort_odd_start:
-      begin
+      Sort_even_start, Sort_even, Sort_odd_start:
         sort_outer <= sort_outer;
-      end
       default:
         sort_outer <= 3'd0;
     endcase
   end
 end
 
-// Counter: i
+// Counter: i (sort_inner)
 always @(posedge clk or posedge reset) begin
   if (reset)
     i <= 3'd0;
   else begin
     case(CurrState)
-      CrossSort_even_start: i <= 3'd2;
-      CrossSort_odd_start: i <= 3'd1;
-      CrossSort_even, CrossSort_odd: i <= i + 3'd2;
-      default: i <= 3'd0;
+      Sort_even_start:
+        i <= 3'd2;
+      Sort_odd_start:
+        i <= 3'd1;
+      Sort_even, Sort_odd:
+        i <= i + 3'd2;
+      default:
+       	i <= 3'd0;
     endcase
   end
 end
@@ -126,6 +122,7 @@ always @(negedge clk or posedge reset) begin
           vy[j] <= 10'b0;
         end
       end
+
       InputState:
       begin
         px[in_i] <= Xin;
@@ -133,37 +130,19 @@ always @(negedge clk or posedge reset) begin
        	vx[in_i] <= Xin - px[0];
         vy[in_i] <= Yin - py[0];
       end
-      CrossSort_even, CrossSort_odd:
+      
+      Sort_even, Sort_odd:
       begin
-        /*if (vx[i]*vy[i+1] - vx[i+1]*vy[i] > 0) begin
-          vx[i  ] <= vx[i+1];
-          vx[i+1] <= vx[i  ];
-          vy[i  ] <= vy[i+1];
-          vy[i+1] <= vy[i  ];
-          px[i  ] <= px[i+1];
-          px[i+1] <= px[i  ];
-          py[i  ] <= py[i+1];
-          py[i+1] <= py[i  ];
-        end
-        else begin
-   	      vx[i  ] <= vx[i  ];
-          vx[i+1] <= vx[i+1];
-          vy[i  ] <= vy[i  ];
-          vy[i+1] <= vy[i+1];
-          px[i  ] <= px[i  ];
-         	px[i+1] <= px[i+1];
-          py[i  ] <= py[i  ];
-          py[i+1] <= py[i+1];
-        end*/
-        vx[i  ] <= (vx[i]*vy[i+1] - vx[i+1]*vy[i] > 0) ? vx[i+1] : vx[i  ];
-        vx[i+1] <= (vx[i]*vy[i+1] - vx[i+1]*vy[i] > 0) ? vx[i  ] : vx[i+1];
-        vy[i  ] <= (vx[i]*vy[i+1] - vx[i+1]*vy[i] > 0) ? vy[i+1] : vy[i  ];
-        vy[i+1] <= (vx[i]*vy[i+1] - vx[i+1]*vy[i] > 0) ? vy[i  ] : vy[i+1];
-        px[i  ] <= (vx[i]*vy[i+1] - vx[i+1]*vy[i] > 0) ? px[i+1] : px[i  ];
-        px[i+1] <= (vx[i]*vy[i+1] - vx[i+1]*vy[i] > 0) ? px[i  ] : px[i+1];
-        py[i  ] <= (vx[i]*vy[i+1] - vx[i+1]*vy[i] > 0) ? py[i+1] : py[i  ];
-        py[i+1] <= (vx[i]*vy[i+1] - vx[i+1]*vy[i] > 0) ? py[i  ] : py[i+1];
+        vx[i  ] <= (cross_compare_result) ? vx[i+1] : vx[i  ];
+        vx[i+1] <= (cross_compare_result) ? vx[i  ] : vx[i+1];
+        vy[i  ] <= (cross_compare_result) ? vy[i+1] : vy[i  ];
+        vy[i+1] <= (cross_compare_result) ? vy[i  ] : vy[i+1];
+        px[i  ] <= (cross_compare_result) ? px[i+1] : px[i  ];
+        px[i+1] <= (cross_compare_result) ? px[i  ] : px[i+1];
+        py[i  ] <= (cross_compare_result) ? py[i+1] : py[i  ];
+        py[i+1] <= (cross_compare_result) ? py[i  ] : py[i+1];
       end
+
       default:
       begin
         for (j = 0; j < 6; j=j+1) begin
@@ -180,82 +159,45 @@ end
 // Next Logic
 always @(point_num or CurrState or in_i or out_i or sort_outer or i) begin
   case(CurrState)
-    InitState: 
-    begin
-      /*for (j = 0; j < 6; j=j+1) begin
-        px[j] <= 10'b0;
-        py[j] <= 10'b0;
-        vx[j] <= 10'b0;
-        vy[j] <= 10'b0;
-      end*/
+    InitState:
       Nextstate <= InputState;
-    end
     
     InputState:
     begin
-      /*px[in_i] <= Xin;
-      py[in_i] <= Yin;
-      vx[in_i] <= Xin - px[0];
-      vy[in_i] <= Yin - py[0];*/
       if (in_i == point_num - 3'd1)
-        Nextstate <= CrossSort_even_start;
+        Nextstate <= Sort_even_start;
       else
         Nextstate <= InputState;
     end
     
-    CrossSort_even_start:
-    begin
-      Nextstate <= CrossSort_even;
-    end
-    CrossSort_even:
+    Sort_even_start:
+      Nextstate <= Sort_even;
+    
+    Sort_even:
     begin
       if (i >= point_num - 3'd3) begin
         if (sort_outer == point_num - 3'd2)
           Nextstate <= OutputState;
         else
-          Nextstate <= CrossSort_odd_start;
+          Nextstate <= Sort_odd_start;
       end
-      else begin
-      //for (i = 2; i < point_num-1; i = i+2) begin
-        /*vx[i  ] <= (vx[i]*vy[i+1] - vx[i+1]*vy[i] > 0) ? vx[i+1] : vx[i  ];
-        vx[i+1] <= (vx[i]*vy[i+1] - vx[i+1]*vy[i] > 0) ? vx[i  ] : vx[i+1];
-        vy[i  ] <= (vx[i]*vy[i+1] - vx[i+1]*vy[i] > 0) ? vy[i+1] : vy[i  ];
-        vy[i+1] <= (vx[i]*vy[i+1] - vx[i+1]*vy[i] > 0) ? vy[i  ] : vy[i+1];
-        px[i  ] <= (vx[i]*vy[i+1] - vx[i+1]*vy[i] > 0) ? px[i+1] : px[i  ];
-        px[i+1] <= (vx[i]*vy[i+1] - vx[i+1]*vy[i] > 0) ? px[i  ] : px[i+1];
-        py[i  ] <= (vx[i]*vy[i+1] - vx[i+1]*vy[i] > 0) ? py[i+1] : py[i  ];
-        py[i+1] <= (vx[i]*vy[i+1] - vx[i+1]*vy[i] > 0) ? py[i  ] : py[i+1];*/
-      //end
-        Nextstate <= CrossSort_even;
-      end
+      else
+        Nextstate <= Sort_even;
     end
     
-    
-    CrossSort_odd_start:
-    begin
-      Nextstate <= CrossSort_odd;
-    end
-    CrossSort_odd:
+    Sort_odd_start:
+      Nextstate <= Sort_odd;
+
+    Sort_odd:
     begin
       if (i >= point_num - 3'd3) begin
         if (sort_outer == point_num - 3'd2)
           Nextstate <= OutputState;
         else
-          Nextstate <= CrossSort_even_start;
+          Nextstate <= Sort_even_start;
       end
-      else begin
-      //for (i = 1; i < point_num-1; i = i+2) begin
-        /*vx[i  ] <= (vx[i]*vy[i+1] - vx[i+1]*vy[i] > 0) ? vx[i+1] : vx[i  ];
-        vx[i+1] <= (vx[i]*vy[i+1] - vx[i+1]*vy[i] > 0) ? vx[i  ] : vx[i+1];
-        vy[i  ] <= (vx[i]*vy[i+1] - vx[i+1]*vy[i] > 0) ? vy[i+1] : vy[i  ];
-        vy[i+1] <= (vx[i]*vy[i+1] - vx[i+1]*vy[i] > 0) ? vy[i  ] : vy[i+1];
-        px[i  ] <= (vx[i]*vy[i+1] - vx[i+1]*vy[i] > 0) ? px[i+1] : px[i  ];
-        px[i+1] <= (vx[i]*vy[i+1] - vx[i+1]*vy[i] > 0) ? px[i  ] : px[i+1];
-        py[i  ] <= (vx[i]*vy[i+1] - vx[i+1]*vy[i] > 0) ? py[i+1] : py[i  ];
-        py[i+1] <= (vx[i]*vy[i+1] - vx[i+1]*vy[i] > 0) ? py[i  ] : py[i+1];*/
-      //end
-        Nextstate <= CrossSort_odd;
-      end
+      else
+        Nextstate <= Sort_odd;
     end
 
     OutputState:
@@ -267,18 +209,9 @@ always @(point_num or CurrState or in_i or out_i or sort_outer or i) begin
     end
     
     default:
-    begin
-      /*for (j = 0; j < 6; j=j+1) begin
-        px[j] <= 10'b0;
-        py[j] <= 10'b0;
-        vx[j] <= 10'b0;
-        vy[j] <= 10'b0;
-      end*/
       Nextstate <= InitState;
-    end
   endcase
 end
-
 
 // Output
 always @(CurrState, out_i) begin
