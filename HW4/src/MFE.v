@@ -75,13 +75,13 @@ module MFE(clk,
       end
     end
   end
-  
-  always @(CurrState) begin
+  // CurrState or pix_cnt or buf_idata or win_cnt or idata
+  always @(CurrState or pix_cnt or win_cnt or idata) begin
     if (CurrState != InputCenterState)
-      buf_idata = buf_idata;
+      buf_idata = 8'b0;
     else begin
       if (pix_cnt == 0) begin
-        case(win_cnt)
+        case(win_cnt[3:0])
           0,1,2,3,6:
             buf_idata = 8'b0;
           default:
@@ -89,7 +89,7 @@ module MFE(clk,
         endcase
       end
       else if (pix_cnt == 127) begin
-        case(win_cnt)
+        case(win_cnt[3:0])
           0,1,2,5,8:
             buf_idata = 8'b0;
           default:
@@ -97,7 +97,7 @@ module MFE(clk,
         endcase
       end
       else if (pix_cnt == 16256) begin
-        case(win_cnt)
+        case(win_cnt[3:0])
           0,3,6,7,8:
             buf_idata = 8'b0;
           default:
@@ -105,7 +105,7 @@ module MFE(clk,
         endcase
       end
       else if (pix_cnt == 16383) begin
-        case(win_cnt)
+        case(win_cnt[3:0])
           2,5,6,7,8:
             buf_idata = 8'b0;
           default:
@@ -113,7 +113,7 @@ module MFE(clk,
         endcase
       end
       else if (pix_cnt >= 1 && pix_cnt <= 126) begin
-        case(win_cnt)
+        case(win_cnt[3:0])
           0,1,2:
             buf_idata = 8'b0;
           default:
@@ -121,7 +121,7 @@ module MFE(clk,
         endcase
       end
       else if (pix_cnt >= 16257 && pix_cnt <= 16382) begin
-        case(win_cnt)
+        case(win_cnt[3:0])
           6,7,8:
             buf_idata = 8'b0;
           default:
@@ -154,7 +154,7 @@ module MFE(clk,
               pix_cnt == 14848 || pix_cnt == 14976 || pix_cnt == 15104 || pix_cnt == 15232 || pix_cnt == 15360 || 
               pix_cnt == 15488 || pix_cnt == 15616 || pix_cnt == 15744 || pix_cnt == 15872 || pix_cnt == 16000 || 
               pix_cnt == 16128) begin
-        case(win_cnt)
+        case(win_cnt[3:0])
           0,3,6:
             buf_idata = 8'b0;
           default:
@@ -187,7 +187,7 @@ module MFE(clk,
               pix_cnt == 14975 || pix_cnt == 15103 || pix_cnt == 15231 || pix_cnt == 15359 || pix_cnt == 15487 || 
               pix_cnt == 15615 || pix_cnt == 15743 || pix_cnt == 15871 || pix_cnt == 15999 || pix_cnt == 16127 || 
               pix_cnt == 16255) begin
-        case(win_cnt)
+        case(win_cnt[3:0])
           2,5,8:
             buf_idata = 8'b0;
           default:
@@ -210,16 +210,13 @@ module MFE(clk,
   end
   
   // Next Logic
-  always @(ready, CurrState) begin
+  always @(ready or CurrState) begin
     case(CurrState)
       
       InitState:
       begin
         if (ready) begin
           Nextstate <= InputCenterState;
-          win_cnt <= 0;
-          pix_cnt <= 0;
-          reset_tmp <= 1;
         end
         else
         Nextstate <= InitState;
@@ -228,25 +225,19 @@ module MFE(clk,
       InputCenterState:
       begin
         Nextstate <= InputPixel;
-        reset_tmp <= 0;
-        tmp_enable <= 1;
       end
       
       InputPixel:
       begin
-        tmp_enable <= 0;
         Nextstate <= InputNextPixel;
       end
       
       InputNextPixel:
       begin
         if (win_cnt == 8) begin
-          win_cnt <= 0;
-          wen <= 1;
           Nextstate <= WriteState;
         end
         else begin
-          win_cnt <= win_cnt + 1;
           Nextstate <= InputCenterState;
         end
       end
@@ -254,16 +245,9 @@ module MFE(clk,
       WriteState:
       begin
         if (pix_cnt == 16383) begin
-          addr <= pix_cnt;
-          data_wr <= tmp[4];
-          pix_cnt <= 0;
           Nextstate <= EndState;
         end
         else begin
-          addr <= pix_cnt;
-          data_wr <= tmp[4];
-          pix_cnt <= pix_cnt + 1;
-          reset_tmp <= 1;
           Nextstate <= InputCenterState;
         end
       end
@@ -273,41 +257,104 @@ module MFE(clk,
     endcase
   end
   
-  always @(win_cnt, pix_cnt) begin
-    case(win_cnt)
+  always @(win_cnt or pix_cnt) begin
+    case(win_cnt[3:0])
       0:
-      iaddr <= pix_cnt[13:0]-129;
+      iaddr <= pix_cnt[13:0]-14'd129;
       1:
-      iaddr <= pix_cnt[13:0]-128;
+      iaddr <= pix_cnt[13:0]-14'd128;
       2:
-      iaddr <= pix_cnt[13:0]-127;
+      iaddr <= pix_cnt[13:0]-14'd127;
       3:
-      iaddr <= pix_cnt[13:0]-1;
+      iaddr <= pix_cnt[13:0]-14'd1;
       4:
       iaddr <= pix_cnt[13:0];
       5:
-      iaddr <= pix_cnt[13:0]+1;
+      iaddr <= pix_cnt[13:0]+14'd1;
       6:
-      iaddr <= pix_cnt[13:0]+127;
+      iaddr <= pix_cnt[13:0]+14'd127;
       7:
-      iaddr <= pix_cnt[13:0]+128;
+      iaddr <= pix_cnt[13:0]+14'd128;
       8:
-      iaddr <= pix_cnt[13:0]+129;
+      iaddr <= pix_cnt[13:0]+14'd129;
       
       default:
-      busy <= pix_cnt[13:0];
+      iaddr <= pix_cnt[13:0];
     endcase
   end
   
-  // Output busy
-  always @(CurrState) begin
+  // Output logic
+  always @(ready or CurrState) begin
+    wen <= 1;
+    reset_tmp <= 0;
+    tmp_enable <= 0;
     case(CurrState)
-      InitState, EndState:
-      busy <= 1'b0;
+      InitState:
+      begin
+        busy <= 1'b0;
+        if (ready) begin
+          win_cnt <= 0;
+          pix_cnt <= 0;
+          reset_tmp <= 1;
+        end
+        else begin
+          win_cnt <= 0;
+          pix_cnt <= 0;
+        end
+      end
       
-      default:
-      busy <= 1'b1;
+      InputCenterState:
+      begin
+        busy <= 1'b1;
+        tmp_enable <= 1;
+      end
+      
+      InputPixel:
+      begin
+        busy <= 1'b1;
+      end
+      
+      InputNextPixel:
+      begin
+        busy <= 1'b1;
+        if (win_cnt == 8) begin
+          win_cnt <= 0;
+        end
+        else begin
+          win_cnt <= win_cnt + 4'd1;
+        end
+      end
+      
+      WriteState:
+      begin
+        busy <= 1'b1;
+        addr <= pix_cnt[13:0];
+        data_wr <= tmp[4];
+        if (pix_cnt == 16383) begin
+          pix_cnt <= 0;
+        end
+        else begin
+          pix_cnt <= pix_cnt + 1;
+          reset_tmp <= 1;
+        end
+      end
+
+      EndState:
+      begin
+        busy <= 1'b0;
+      end
+      
+      default: begin
+        busy <= 1'b0;
+        win_cnt <= 0;
+        pix_cnt <= 0;
+      end
     endcase
   end
+
+  // always @(posedge clk) begin
+  //   case (CurrState)
+  //   endcase
+  // end
   
 endmodule
