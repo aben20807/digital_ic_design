@@ -1,3 +1,21 @@
+""" README
+
+Author: Huang Po-Hsuan (P78081528)
+
+Description:
+create img.dat and golden.dat from image.jpg
+where img.dat is a 128x128 image with salt and pepper noise
+and golden.dat is a 128x128 image processed by median filter
+
+Environment setup:
+$ vrtualenv -p python3.6 venv
+$ source venv/bin/activate
+$ pip install scikit-image==0.17.2
+
+Usage:
+$ python3 main.py
+"""
+
 import argparse
 import skimage
 from skimage.io import imread, imsave
