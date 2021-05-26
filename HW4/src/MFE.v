@@ -32,7 +32,7 @@ module MFE(clk,
   // reg [7:0] median;
   reg [7:0] tmp [8:0];
   reg reset_tmp;
-  reg reset_win;
+  // reg reset_win;
   reg tmp_enable;
   
   reg [2:0] CurrState, Nextstate;
@@ -50,38 +50,86 @@ module MFE(clk,
 
   wire [7:0] pix_cnt_modulo;
   // wire [13:0] pix_cnt_wire;
-
+  integer i, j;
   // assign win_cnt_wire = win_cnt;
   assign pix_cnt_modulo = (pix_cnt % 8'd128);
-  
-  integer i;
+  wire [8:0] buf_idata_sub_tmp [8:0];
 
-  always @(negedge clk or posedge reset_tmp) begin
+  wire buf_idata_ge_tmp [8:0];
+  // always @(buf_idata or tmp[0] or tmp[1] or tmp[2] or tmp[3] or tmp[4] or tmp[5] or tmp[6] or tmp[7] or tmp[8]) begin
+  //   for (j = 0; j < 9; j = j + 1)
+  //     CLA_9bit(buf_idata_sub_tmp[j], $signed({1'b0,buf_idata}), $signed({1'b0,tmp[j]}), 0);
+  // end
+
+  // assign buf_idata_sub_tmp[0] = ($signed({1'b0,buf_idata}) - $signed({1'b0,tmp[0]}));
+  // assign buf_idata_sub_tmp[1] = ($signed({1'b0,buf_idata}) - $signed({1'b0,tmp[1]}));
+  // assign buf_idata_sub_tmp[2] = ($signed({1'b0,buf_idata}) - $signed({1'b0,tmp[2]}));
+  // assign buf_idata_sub_tmp[3] = ($signed({1'b0,buf_idata}) - $signed({1'b0,tmp[3]}));
+  // assign buf_idata_sub_tmp[4] = ($signed({1'b0,buf_idata}) - $signed({1'b0,tmp[4]}));
+  // assign buf_idata_sub_tmp[5] = ($signed({1'b0,buf_idata}) - $signed({1'b0,tmp[5]}));
+  // assign buf_idata_sub_tmp[6] = ($signed({1'b0,buf_idata}) - $signed({1'b0,tmp[6]}));
+  // assign buf_idata_sub_tmp[7] = ($signed({1'b0,buf_idata}) - $signed({1'b0,tmp[7]}));
+  // assign buf_idata_sub_tmp[8] = ($signed({1'b0,buf_idata}) - $signed({1'b0,tmp[8]}));
+
+  // CLA_9bit c0(buf_idata_sub_tmp[0], $signed({1'b0,buf_idata}), $signed({1'b0,tmp[0]}));
+  // CLA_9bit c1(buf_idata_sub_tmp[1], $signed({1'b0,buf_idata}), $signed({1'b0,tmp[1]}));
+  // CLA_9bit c2(buf_idata_sub_tmp[2], $signed({1'b0,buf_idata}), $signed({1'b0,tmp[2]}));
+  // CLA_9bit c3(buf_idata_sub_tmp[3], $signed({1'b0,buf_idata}), $signed({1'b0,tmp[3]}));
+  // CLA_9bit c4(buf_idata_sub_tmp[4], $signed({1'b0,buf_idata}), $signed({1'b0,tmp[4]}));
+  // CLA_9bit c5(buf_idata_sub_tmp[5], $signed({1'b0,buf_idata}), $signed({1'b0,tmp[5]}));
+  // CLA_9bit c6(buf_idata_sub_tmp[6], $signed({1'b0,buf_idata}), $signed({1'b0,tmp[6]}));
+  // CLA_9bit c7(buf_idata_sub_tmp[7], $signed({1'b0,buf_idata}), $signed({1'b0,tmp[7]}));
+  // CLA_9bit c8(buf_idata_sub_tmp[8], $signed({1'b0,buf_idata}), $signed({1'b0,tmp[8]}));
+
+  // assign buf_idata_ge_tmp[0] = !buf_idata_sub_tmp[0][8];
+  // assign buf_idata_ge_tmp[1] = !buf_idata_sub_tmp[1][8];
+  // assign buf_idata_ge_tmp[2] = !buf_idata_sub_tmp[2][8];
+  // assign buf_idata_ge_tmp[3] = !buf_idata_sub_tmp[3][8];
+  // assign buf_idata_ge_tmp[4] = !buf_idata_sub_tmp[4][8];
+  // assign buf_idata_ge_tmp[5] = !buf_idata_sub_tmp[5][8];
+  // assign buf_idata_ge_tmp[6] = !buf_idata_sub_tmp[6][8];
+  // assign buf_idata_ge_tmp[7] = !buf_idata_sub_tmp[7][8];
+  // assign buf_idata_ge_tmp[8] = !buf_idata_sub_tmp[8][8];
+
+  // wire buf_idata_ge_tmpi_1 [8:0];
+  assign buf_idata_ge_tmp[0] = buf_idata >= tmp[0];
+  assign buf_idata_ge_tmp[1] = buf_idata >= tmp[1];
+  assign buf_idata_ge_tmp[2] = buf_idata >= tmp[2];
+  assign buf_idata_ge_tmp[3] = buf_idata >= tmp[3];
+  assign buf_idata_ge_tmp[4] = buf_idata >= tmp[4];
+  assign buf_idata_ge_tmp[5] = buf_idata >= tmp[5];
+  assign buf_idata_ge_tmp[6] = buf_idata >= tmp[6];
+  assign buf_idata_ge_tmp[7] = buf_idata >= tmp[7];
+  assign buf_idata_ge_tmp[8] = buf_idata >= tmp[8];
+  
+  
+
+  always @(posedge clk or posedge reset_tmp) begin
     if (reset_tmp)
       tmp[0] <= 8'b0;
     else if (!tmp_enable)
       tmp[0] <= tmp[0];
     else begin
-      if (tmp[0] > buf_idata)
+      if (!buf_idata_ge_tmp[0])
         tmp[0] <= tmp[0];
       else
         tmp[0] <= buf_idata;
     end
   end
 
-  always @(negedge clk or posedge reset_tmp) begin
+  always @(posedge clk or posedge reset_tmp) begin
     for (i = 1; i < 9; i = i + 1) begin
       if (reset_tmp)
         tmp[i] <= 8'b0;
       else if (!tmp_enable)
         tmp[i] <= tmp[i];
       else begin
-        if (tmp[i] > buf_idata)
+        if (!buf_idata_ge_tmp[i])
           tmp[i] <= tmp[i];
         // else if ((tmp[i] <= buf_idata)&&(tmp[i-1] <= buf_idata))
-        else if ((buf_idata - tmp[i] >= 0)&&(tmp[i-1] <= buf_idata))
+        else if ((buf_idata_ge_tmp[i])&&(buf_idata_ge_tmp[i-1]))
           tmp[i] <= tmp[i-1];
-        else if ((tmp[i] <= buf_idata)&&(tmp[i-1] - buf_idata > 0))
+        else if ((buf_idata_ge_tmp[i])&&(!buf_idata_ge_tmp[i-1]))
           tmp[i] <= buf_idata;
       end
     end
@@ -385,7 +433,7 @@ module MFE(clk,
     // wen <= 1;
     reset_tmp <= 0;
     tmp_enable <= 0;
-    reset_win <= 0;
+    // reset_win <= 0;
     case(CurrState)
       InitState:
       begin
@@ -533,4 +581,37 @@ module MFE(clk,
     end
   end
   
+endmodule
+
+
+module CLA_3bit(S, Cout, PG, GG, A, B, Cin);
+    output [2:0] S;
+    output Cout,PG,GG;
+    input [2:0] A;
+    input [2:0] B;
+    input Cin;
+    wire [2:0] G,P,C;
+ 
+    assign G = A & B; //Generate
+    assign P = A ^ B; //Propagate
+    assign C[0] = Cin;
+    assign C[1] = G[0] | (P[0] & C[0]);
+    assign C[2] = G[1] | (P[1] & G[0]) | (P[1] & P[0] & C[0]);
+    assign Cout = G[2] | (P[2] & G[1]) | (P[2] & P[1] & G[0]) | (P[2] & P[1] & P[0] & C[0]);
+    assign S = P ^ C;
+    
+    assign PG = P[2] & P[1] & P[0];
+    assign GG = G[2] | (P[2] & G[1]) | (P[2] & P[1] & G[0]);
+endmodule
+
+module CLA_9bit(Sum, A, B);
+  output [8:0] Sum;
+  input [8:0] A;
+  input [8:0] B;
+  wire Cout;
+  wire c2,p2,g2,c5,p5,g5,p8,g8;
+  wire [8:0] iB = ~B;
+  CLA_3bit CLA1(Sum[2:0], c2,   p2, g2, A[2:0], iB[2:0], 1'b0);
+  CLA_3bit CLA2(Sum[5:3], c5,   p5, g5, A[5:3], iB[5:3], c2);
+  CLA_3bit CLA3(Sum[8:6], Cout, p8, g8, A[8:6], iB[8:6], c5);
 endmodule
