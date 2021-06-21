@@ -8,7 +8,7 @@
 
 
 
-module testfixture1;
+module testfixture2;
 
 reg   clk ;
 reg   reset ;
