@@ -34,7 +34,8 @@ module IFE(clk,reset,busy,ready,iaddr,idata,data_rd,data_wr,addr,wen,sel);
   InputNextPixel = 3'd3,
   WriteState = 3'd4,
   Sort_even = 3'd5,
-  EndState = 3'd6;
+  EndState = 3'd6,
+  PreWriteState = 3'd7;
 
   reg [3:0] win_cnt;
   reg [13:0] pix_cnt;
@@ -55,6 +56,29 @@ module IFE(clk,reset,busy,ready,iaddr,idata,data_rd,data_wr,addr,wen,sel);
   assign buf_idata_ge_tmp[6] = buf_idata >= tmp[6];
   assign buf_idata_ge_tmp[7] = buf_idata >= tmp[7];
   assign buf_idata_ge_tmp[8] = buf_idata >= tmp[8];
+
+  wire [7:0] mean3_3;
+  assign mean3_3 = (tmp[0]+tmp[1]+tmp[2]+tmp[3]+tmp[4]+tmp[5]+tmp[6]+tmp[7]+tmp[8])/9;
+
+//   wire [7:0] mean5_5;
+//   assign mean5_5 = (tmp5[0]+tmp5[1]+tmp5[2]+tmp5[3]+tmp5[4]+
+//   					tmp5[5]+tmp5[6]+tmp5[7]+tmp5[8]+tmp5[9]+
+// 					tmp5[10]+tmp5[11]+tmp5[12]+tmp5[13]+tmp5[14]+
+//   					tmp5[15]+tmp5[16]+tmp5[17]+tmp5[18]+tmp5[19]+
+// 					tmp5[20]+tmp5[21]+tmp5[22]+tmp5[23]+tmp5[24])/25;
+
+  reg [7:0] center;
+
+  always @(posedge clk or posedge reset_tmp) begin
+    if (reset_tmp)
+      tmp[0] <= 8'b0;
+	else begin
+		if(win_cnt == 4)
+			center <= idata;
+		else
+			center <= center;
+	end
+  end
 
   always @(posedge clk or posedge reset_tmp) begin
     if (reset_tmp)
@@ -195,13 +219,16 @@ module IFE(clk,reset,busy,ready,iaddr,idata,data_rd,data_wr,addr,wen,sel);
       InputNextPixel://3
       begin
         if (win_cnt == 8) begin
-          Nextstate <= WriteState;
+          Nextstate <= PreWriteState;
         end
         else begin
           Nextstate <= InputPixel;
         end
       end
-
+	  PreWriteState:
+	  begin
+		  Nextstate <= WriteState;
+	  end
       
       WriteState://4
       begin
@@ -265,7 +292,7 @@ module IFE(clk,reset,busy,ready,iaddr,idata,data_rd,data_wr,addr,wen,sel);
         reset_tmp <= 1;
       end
       
-      InputPixel, WriteState, EndState:
+      InputPixel, PreWriteState, WriteState, EndState:
       begin
         busy <= 1'b1;
       end
@@ -284,7 +311,7 @@ module IFE(clk,reset,busy,ready,iaddr,idata,data_rd,data_wr,addr,wen,sel);
 
   always @(negedge clk or posedge reset) begin
     if (reset)
-      win_cnt <= 0;
+      win_cnt <= 8;
     else
     begin
       case (CurrState)
@@ -336,8 +363,16 @@ module IFE(clk,reset,busy,ready,iaddr,idata,data_rd,data_wr,addr,wen,sel);
       begin
         wen <= 1;
         addr <= pix_cnt;
-        data_wr <= tmp[8];
-        
+		case (sel)
+		0:
+			data_wr <= mean3_3;
+		1:
+			data_wr <= 8'b0;
+		2:
+			data_wr <= tmp[8];
+		3:
+			data_wr <= (center < 8'd127)? 8'd0 : center;
+		endcase
       end
 
       default: begin
